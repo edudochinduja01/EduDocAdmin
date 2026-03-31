@@ -5,6 +5,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "routes": [
+    { "src": "/", "dest": "/login.html" },
     { "src": "/login", "dest": "/login.html" },
     { "src": "/dashboard", "dest": "/dashboard.html" },
     { "src": "/products", "dest": "/products.html" },
