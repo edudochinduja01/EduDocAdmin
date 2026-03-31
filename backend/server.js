@@ -25,12 +25,16 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, Postman, curl)
+    // Allow requests with no origin (e.g. Postman, curl, mobile apps)
     if (!origin) return callback(null, true);
+    // Allow any vercel.app subdomain (covers preview deployments too)
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
     if (allowedOrigins.some(o => origin.startsWith(o))) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    console.warn(`CORS blocked: ${origin}`);
+    // Return false (not an error) so preflight gets 204, not 500
+    return callback(null, false);
   },
   credentials: true,
 }));
