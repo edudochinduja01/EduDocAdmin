@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transactions | EduDoc Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js"></script>
+</head>
+
+<body class="u-body">
+    <!-- Mobile top header -->
+    <div class="top-header">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <img src="edudoc_logo.png" alt="EduDoc Logo" class="mobile-logo-img">
+        <h1 style="font-size:24px;
+               background:linear-gradient(90deg,#7F5CFF,#FF70B7);
+               -webkit-text-fill-color:transparent;
+               background-clip:text;">
+            EduDoc
+        </h1>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="edudoc">
+            <img src="edudoc_logo.png" alt="EduDoc Logo">
+            <h1>EduDoc</h1>
+        </div>
+        <nav class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="products.html">Products</a>
+            <a href="offers.html">Bundle Offers</a>
+            <a href="transactions.html" class="active">Transactions</a>
+            <a href="users.html">Users</a>
+            <a href="activity.html">Activity Logs</a>
+        </nav>
+    </aside>
+
+    <main>
+        <h1>Transactions</h1>
+
+        <!-- Header Actions -->
+        <div class="table-header-actions">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="localSearch" class="local-search-input" placeholder="Search by user or description..." oninput="applyFilters()">
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <!-- Existing topbar content moved here if needed -->
+            </div>
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="filters-bar" style="display: flex; gap: 15px; margin-top: 20px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+            <select id="filterType" class="filter-select" onchange="applyFilters()">
+                <option value="">All Types</option>
+                <option value="credit">Credit</option>
+                <option value="debit">Debit</option>
+                <option value="purchased">Purchased</option>
+            </select>
+
+            <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+                <label>Sort By:</label>
+                <select id="sortBy" class="filter-select" onchange="applyFilters()">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="amountHigh">Amount: High to Low</option>
+                    <option value="amountLow">Amount: Low to High</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-container">
+            <table id="transactionsTable">
+                <thead>
+                    <tr>
+                        <th>#ID</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = api.getToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            setupSearch('searchInput', 'searchResults');
+            loadTransactions();
+        });
+
+        let currentTransactions = [];
+
+        async function loadTransactions() {
+            const tbody = document.querySelector('#transactionsTable tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#9aa6b2;">Loading...</td></tr>';
+
+            try {
+                console.log('Fetching transactions...');
+                const transactions = await api.getTransactions();
+                console.log('Transactions received:', transactions);
+                
+                currentTransactions = transactions || [];
+                applyFilters(); 
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                tbody.innerHTML = 
+                    `<tr><td colspan="6" style="text-align:center; color: red;">Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        function applyFilters() {
+            const typeFilter = document.getElementById('filterType').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const searchText = document.getElementById('localSearch').value.toLowerCase();
+
+            let filtered = [...currentTransactions];
+
+            // Local Search
+            if (searchText) {
+                filtered = filtered.filter(t => 
+                    (t.users && t.users.full_name && t.users.full_name.toLowerCase().includes(searchText)) || 
+                    (t.description && t.description.toLowerCase().includes(searchText)) ||
+                    (t.type && t.type.toLowerCase().includes(searchText))
+                );
+            }
+
+            if (typeFilter) {
+                filtered = filtered.filter(t => t.type && t.type.toLowerCase() === typeFilter.toLowerCase());
+            }
+
+            filtered.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                const amountA = a.amount || 0;
+                const amountB = b.amount || 0;
+
+                switch (sortBy) {
+                    case 'newest': return dateB - dateA;
+                    case 'oldest': return dateA - dateB;
+                    case 'amountHigh': return amountB - amountA;
+                    case 'amountLow': return amountA - amountB;
+                    default: return 0;
+                }
+            });
+
+            renderTable(filtered);
+        }
+
+        function renderTable(transactions) {
+            const tbody = document.querySelector('#transactionsTable tbody');
+            tbody.innerHTML = '';
+
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No transactions found</td></tr>';
+                return;
+            }
+
+            transactions.forEach(tx => {
+                const tr = document.createElement('tr');
+                const userFullName = tx.users ? (tx.users.full_name || 'Unknown') : 'Unknown User';
+                const userEmail = tx.users ? (tx.users.email || '') : '';
+                const userDisplay = `${userFullName} <br><small style="color:#aaa">${userEmail}</small>`;
+                
+                const formattedDate = new Date(tx.created_at).toLocaleString();
+                
+                let amountColor = '#f1f5f9';
+                const typeLower = (tx.type || '').toLowerCase();
+                if (typeLower === 'credit') amountColor = '#34d399';
+                if (typeLower === 'debit' || typeLower === 'purchased') amountColor = '#f87171';
+
+                tr.innerHTML = `
+                    <td style="color:#888">#${tx.id}</td>
+                    <td>${userDisplay}</td>
+                    <td><span class="status-badge" style="background: rgba(127, 92, 255, 0.2); color: #a78bfa; border: 1px solid rgba(127, 92, 255, 0.2); border-radius:4px; padding: 2px 6px;">${tx.type}</span></td>
+                    <td style="color: ${amountColor}; font-weight: 600;">₹${tx.amount}</td>
+                    <td>${tx.description || '-'}</td>
+                    <td style="color:#aaa; font-size:0.9em;">${formattedDate}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>

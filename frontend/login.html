@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDoc Admin Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="l-body">
+    <div class="container">
+        <div class="login-card">
+            <div class="logo-wrap">
+                <img src="edudoc_logo.png" width="80px">
+                <h1 class="brand">EduDoc</h1>
+                <p class="subtitle">Admin Panel Login</p>
+            </div>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="Enter your admin email" required>
+                </div>
+
+                <div id="otpGroup" class="input-group" style="display: none;">
+                    <label for="otp">OTP Code</label>
+                    <input type="text" id="otp" placeholder="Enter 6-digit OTP" required maxlength="6">
+                </div>
+
+                <button type="button" id="sendOtpBtn" class="login-btn">Send OTP</button>
+                <button type="button" id="verifyOtpBtn" class="login-btn" style="display: none;">Verify OTP</button>
+
+                <p id="errorMsg" class="error"></p>
+                <p id="successMsg" class="success" style="color: green; margin-top: 10px;"></p>
+            </form>
+        </div>
+    </div>
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script>
+        const emailInput = document.getElementById('email');
+        const otpInput = document.getElementById('otp');
+        const sendOtpBtn = document.getElementById('sendOtpBtn');
+        const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+        const otpGroup = document.getElementById('otpGroup');
+        const errorMsg = document.getElementById('errorMsg');
+        const successMsg = document.getElementById('successMsg');
+
+        function clearMessages() {
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+        }
+
+        // Send OTP
+        sendOtpBtn.addEventListener('click', async () => {
+            clearMessages();
+            const email = emailInput.value;
+            if (!email) {
+                errorMsg.textContent = 'Please enter your email.';
+                return;
+            }
+
+            try {
+                successMsg.textContent = 'Sending OTP...';
+                const data = await api.sendOtp(email);
+                successMsg.textContent = data.message || 'OTP sent to your email.';
+                
+                // Show OTP input and verify button
+                otpGroup.style.display = 'block';
+                sendOtpBtn.style.display = 'none';
+                verifyOtpBtn.style.display = 'block';
+                emailInput.disabled = true;
+                otpInput.focus();
+            } catch (error) {
+                errorMsg.textContent = error.message || 'Failed to send OTP.';
+                successMsg.textContent = '';
+            }
+        });
+
+        // Verify OTP
+        verifyOtpBtn.addEventListener('click', async () => {
+            clearMessages();
+            const email = emailInput.value;
+            const otp = otpInput.value;
+
+            if (!otp) {
+                errorMsg.textContent = 'Please enter the OTP code.';
+                return;
+            }
+
+            try {
+                successMsg.textContent = 'Verifying OTP...';
+                const data = await api.verifyOtp(email, otp);
+                
+                // Store the access token
+                api.setToken(data.access_token);
+                successMsg.textContent = 'OTP verified! Redirecting...';
+                
+                // Redirect to dashboard
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1000);
+            } catch (error) {
+                errorMsg.textContent = error.message || 'OTP verification failed.';
+                successMsg.textContent = '';
+                api.removeToken();
+            }
+        });
+
+        // Check for magic link callback (hash token)
+        window.addEventListener('load', async () => {
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                const params = new URLSearchParams(hash.substring(1));
+                const accessToken = params.get('access_token');
+                if (accessToken) {
+                    api.setToken(accessToken);
+                    successMsg.textContent = 'Verifying admin access...';
+                    try {
+                        await api.verifyAdmin();
+                        window.location.href = 'dashboard.html';
+                    } catch (error) {
+                        errorMsg.textContent = 'Login failed: ' + error.message;
+                        api.removeToken();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

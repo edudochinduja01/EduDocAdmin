@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js"></script>
+    <title>Activity Logs - EduDoc Admin</title>
+    <style>
+        .json-view {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            color: #cbd5e1;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            font-size: 12px;
+        }
+        .diff-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body class="u-body">
+    <div class="top-header">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <img src="edudoc_logo.png" alt="EduDoc Logo" class="mobile-logo-img">
+        <h1 style="font-size:24px;
+               background:linear-gradient(90deg,#7F5CFF,#FF70B7);
+               -webkit-text-fill-color:transparent;
+               background-clip:text;">
+            EduDoc
+        </h1>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="edudoc">
+            <img src="edudoc_logo.png" alt="EduDoc Logo">
+            <h1>EduDoc</h1>
+        </div>
+        <nav class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="products.html">Products</a>
+            <a href="offers.html">Bundle Offers</a>
+            <a href="transactions.html">Transactions</a>
+            <a href="users.html">Users</a>
+            <a href="activity.html" class="active">Activity Logs</a>
+        </nav>
+    </aside>
+
+    <main>
+        <h1>Activity Logs</h1>
+
+        <!-- Header Actions -->
+        <div class="table-header-actions">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="localSearch" class="local-search-input" placeholder="Search by user, action or description..." oninput="applyActivityFilters()">
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <!-- Additional actions if needed -->
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="activityTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Entity Type</th>
+                        <th>Entity ID</th>
+                        <th>Created At</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = api.getToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Init Search
+            setupSearch('searchInput', 'searchResults');
+
+            loadActivityLogs();
+        });
+
+        let currentLogs = [];
+
+        async function loadActivityLogs() {
+            try {
+                const logs = await api.getActivityLogs();
+                currentLogs = logs || [];
+                applyActivityFilters();
+            } catch (error) {
+                console.error('Error loading activity logs:', error);
+                alert('Failed to load activity logs: ' + error.message);
+            }
+        }
+
+        function applyActivityFilters() {
+            const searchText = document.getElementById('localSearch').value.toLowerCase();
+            let filtered = [...currentLogs];
+
+            if (searchText) {
+                filtered = filtered.filter(log => {
+                    const userName = log.users ? log.users.full_name.toLowerCase() : '';
+                    const email = log.users ? log.users.email.toLowerCase() : '';
+                    const action = log.action ? log.action.toLowerCase() : '';
+                    const desc = log.description ? log.description.toLowerCase() : '';
+                    
+                    return userName.includes(searchText) || 
+                           email.includes(searchText) || 
+                           action.includes(searchText) || 
+                           desc.includes(searchText);
+                });
+            }
+
+            renderLogsTable(filtered);
+        }
+
+        function renderLogsTable(logs) {
+            const tbody = document.querySelector('#activityTable tbody');
+            tbody.innerHTML = '';
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No match found</td></tr>';
+                return;
+            }
+
+            logs.forEach(log => {
+                const tr = document.createElement('tr');
+                const userDisplay = log.users ? `${log.users.full_name} <br><small style="color:#64748b">${log.users.email}</small>` : `Unknown (ID: ${log.user_id})`;
+
+                tr.innerHTML = `
+                    <td style="color:#64748b; font-size: 11px;">#${log.id}</td>
+                    <td>${userDisplay}</td>
+                    <td><span class="user-badge">${log.role || 'Admin'}</span></td>
+                    <td><b style="color: #7F5CFF;">${log.action}</b></td>
+                    <td>${log.entity_type || '-'}</td>
+                    <td><small style="color:#64748b">${log.entity_id || '-'}</small></td>
+                    <td style="color:#94a3b8; font-size:12px;">${new Date(log.created_at).toLocaleString()}</td>
+                    <td>
+                        <button onclick='openDetailsModal(${JSON.stringify(log.old_data || {})}, ${JSON.stringify(log.new_data || {})}, "${log.description || ''}")' class="edit-btn" style="padding: 4px 10px; font-size: 12px; background: #334155;">Details</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openDetailsModal(oldData, newData, description) {
+            document.getElementById('modalDescription').innerText = description || 'No description provided.';
+            
+            document.getElementById('oldDataView').textContent = JSON.stringify(oldData, null, 2);
+            document.getElementById('newDataView').textContent = JSON.stringify(newData, null, 2);
+
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+    </script>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Log Details</h2>
+                <span onclick="closeDetailsModal()" class="close-btn">&times;</span>
+            </div>
+
+            <div class="form-group">
+                <label>Description</label>
+                <div id="modalDescription" style="color: white; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="diff-container">
+                <div class="form-group">
+                    <label style="color: #ff6b6b;">Old Data</label>
+                    <div id="oldDataView" class="json-view"></div>
+                </div>
+                <div class="form-group">
+                    <label style="color: #4ade80;">New Data</label>
+                    <div id="newDataView" class="json-view"></div>
+                </div>
+            </div>
+
+            <button onclick="closeDetailsModal()" class="save-btn" style="background-color: #334155; margin-top: 15px;">Close</button>
+        </div>
+    </div>
+</body>
+</html>

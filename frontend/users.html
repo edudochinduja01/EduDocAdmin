@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js"></script>
+    <title>Users - EduDoc Admin</title>
+</head>
+
+<body class="u-body">
+    <div class="top-header">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <img src="edudoc_logo.png" alt="EduDoc Logo" class="mobile-logo-img">
+        <h1 style="font-size:24px;
+               background:linear-gradient(90deg,#7F5CFF,#FF70B7);
+               -webkit-text-fill-color:transparent;
+               background-clip:text;">
+            EduDoc
+        </h1>
+    </div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="edudoc">
+            <img src="edudoc_logo.png" alt="EduDoc Logo">
+            <h1>EduDoc</h1>
+        </div>
+        <nav class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="products.html">Products</a>
+            <a href="offers.html">Bundle Offers</a>
+            <a href="transactions.html">Transactions</a>
+            <a href="users.html" class="active">Users</a>
+            <a href="activity.html">Activity Logs</a>
+        </nav>
+    </aside>
+
+    <main>
+        <h1>Users</h1>
+
+        <!-- Header Actions -->
+        <div class="table-header-actions">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="localSearch" class="local-search-input" placeholder="Search by name or email..." oninput="applyFilters()">
+                <div id="bulkActions" class="bulk-actions" style="display: none;">
+                    <span id="selectedCount" style="color: #94a3b8; font-size: 13px; margin-right: 15px;">0 selected</span>
+                    <button onclick="bulkStatusUpdate('Active')" class="edit-btn" style="padding: 6px 12px; font-size: 12px; background: #10b981;">Activate All</button>
+                    <button onclick="bulkStatusUpdate('Banned')" class="del-btn" style="padding: 6px 12px; font-size: 12px;">Ban All</button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="downloadCSV()" class="edit-btn" style="background: #334155;">Export CSV</button>
+                <button class="add-btn" onclick="openAddUserModal()" style="background-color: #7F5CFF; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">+ Add User</button>
+            </div>
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="filters-bar" style="display: flex; gap: 15px; margin-top: 20px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+            <select id="filterRole" class="filter-select" onchange="applyFilters()">
+                <option value="">All Roles</option>
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+            </select>
+
+            <select id="filterStatus" class="filter-select" onchange="applyFilters()">
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Banned">Banned</option>
+            </select>
+
+            <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+                <label>Sort By:</label>
+                <select id="sortBy" class="filter-select" onchange="applyFilters()">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="walletHigh">Wallet: High to Low</option>
+                    <option value="walletLow">Wallet: Low to High</option>
+                    <option value="nameAZ">Name: A-Z</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="adminTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Wallet</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = api.getToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Init Search
+            setupSearch('searchInput', 'searchResults');
+            
+            loadUsers();
+        });
+
+        let currentUser = null; // For editing
+        let currentUsers = []; // Store fetched users locally
+
+        async function loadUsers() {
+            try {
+                const users = await api.getUsers();
+                currentUsers = users;
+                applyFilters(); // Initial render
+            } catch (error) {
+                console.error('Error loading users:', error);
+                alert('Failed to load users: ' + error.message);
+            }
+        }
+
+        function applyFilters() {
+            const roleFilter = document.getElementById('filterRole').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+            const sortBy = document.getElementById('sortBy').value;
+            const searchText = document.getElementById('localSearch').value.toLowerCase();
+
+            let filtered = [...currentUsers];
+
+            // Local Search
+            if (searchText) {
+                filtered = filtered.filter(u => 
+                    (u.full_name && u.full_name.toLowerCase().includes(searchText)) || 
+                    (u.email && u.email.toLowerCase().includes(searchText))
+                );
+            }
+
+            // Filter
+            if (roleFilter) {
+                filtered = filtered.filter(u => u.role === roleFilter);
+            }
+            if (statusFilter) {
+                filtered = filtered.filter(u => u.status === statusFilter);
+            }
+
+            // Sort
+            filtered.sort((a, b) => {
+                switch (sortBy) {
+                    case 'newest':
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    case 'oldest':
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    case 'walletHigh':
+                        return (b.wallet_balance || 0) - (a.wallet_balance || 0);
+                    case 'walletLow':
+                        return (a.wallet_balance || 0) - (b.wallet_balance || 0);
+                    case 'nameAZ':
+                        return (a.full_name || '').localeCompare(b.full_name || '');
+                    default:
+                        return 0;
+                }
+            });
+
+            renderTable(filtered);
+        }
+
+        function renderTable(users) {
+            const tbody = document.querySelector('#adminTable tbody');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No users found</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="user-checkbox" value="${user.id}" onchange="updateBulkUI()"></td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <img src="${user.profile_image_url || 'https://via.placeholder.com/40'}" style="width:35px; height:35px; border-radius:50%;">
+                            <div>
+                                <div style="font-weight:600;">${user.full_name || '-'}</div>
+                                <div style="font-size:12px; color:#94a3b8;">${user.email}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="role-badge ${user.role ? user.role.toLowerCase() : ''}">${user.role || 'User'}</span></td>
+                    <td>${user.phone_num || '-'}</td>
+                    <td>${user.status || 'Active'}</td>
+                    <td>${user.wallet_balance || 0}</td>
+                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="action-btn edit-btn-row" onclick="openEditUserModal('${user.id}', '${user.email}', '${user.role}', '${user.full_name || ''}', '${user.phone_num || ''}', '${user.status || 'Active'}', '${user.wallet_balance || 0}', '${user.profile_image_url || ''}')">Edit</button>
+                        <button class="action-btn delete-btn-row" onclick="deleteUser('${user.id}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openAddUserModal() {
+            currentUser = null;
+            document.getElementById('modalTitle').innerText = 'Add User';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRole').value = 'User';
+            document.getElementById('userFullName').value = '';
+            document.getElementById('userPhone').value = '';
+            document.getElementById('userStatus').value = 'Active';
+            document.getElementById('userWallet').value = '0';
+            document.getElementById('userProfileImage').value = '';
+            
+            document.getElementById('userPasswordContainer').style.display = 'block';
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        function openEditUserModal(id, email, role, fullName, phone, status, wallet, profileImage) {
+            currentUser = id;
+            document.getElementById('modalTitle').innerText = 'Edit User';
+            document.getElementById('userEmail').value = email;
+            document.getElementById('userPassword').value = ''; // Password optional on edit
+            document.getElementById('userRole').value = role;
+            document.getElementById('userFullName').value = fullName;
+            document.getElementById('userPhone').value = phone;
+            document.getElementById('userStatus').value = status;
+            document.getElementById('userWallet').value = wallet;
+            document.getElementById('userProfileImage').value = profileImage;
+
+            document.getElementById('userPasswordContainer').style.display = 'block'; // Allow password reset
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        async function saveUser() {
+            const email = document.getElementById('userEmail').value;
+            const password = document.getElementById('userPassword').value;
+            const role = document.getElementById('userRole').value;
+            const full_name = document.getElementById('userFullName').value;
+            const phone_num = document.getElementById('userPhone').value;
+            const status = document.getElementById('userStatus').value;
+            const wallet_balance = document.getElementById('userWallet').value;
+            const profile_image_url = document.getElementById('userProfileImage').value;
+
+            if (!email || !role || !full_name) {
+                alert('Email, Role, and Full Name are required.');
+                return;
+            }
+
+            const userData = { 
+                email, 
+                role, 
+                full_name, 
+                phone_num, 
+                status, 
+                wallet_balance: parseInt(wallet_balance) || 0,
+                profile_image_url 
+            };
+            
+            if (password) userData.password = password;
+
+            try {
+                if (currentUser) {
+                    // Update
+                    const updated = await api.updateUser(currentUser, userData);
+                    // Log activity
+                    api.logActivity({
+                        action: 'UPDATE_USER',
+                        entity_type: 'user',
+                        entity_id: currentUser,
+                        description: `Updated user: ${email}`,
+                        new_data: userData
+                    }).catch(e => console.warn('Activity log failed:', e));
+                    alert('User updated successfully');
+                } else {
+                    // Create
+                    if (!password) {
+                        alert('Password is required for new users.');
+                        return;
+                    }
+                    const created = await api.createUser(userData);
+                    // Log activity
+                    api.logActivity({
+                        action: 'CREATE_USER',
+                        entity_type: 'user',
+                        entity_id: created?.user?.id || null,
+                        description: `Created user: ${email} (${role})`,
+                        new_data: { email, role, full_name }
+                    }).catch(e => console.warn('Activity log failed:', e));
+                    alert('User created successfully');
+                }
+                closeUserModal();
+                loadUsers();
+            } catch (error) {
+                console.error('Error saving user:', error);
+                alert('Failed to save user: ' + error.message);
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+            // Grab user info before deletion for the log
+            const target = currentUsers.find(u => u.id === id);
+            try {
+                await api.deleteUser(id);
+                // Log activity
+                api.logActivity({
+                    action: 'DELETE_USER',
+                    entity_type: 'user',
+                    entity_id: id,
+                    description: `Deleted user: ${target ? target.email : id}`,
+                    old_data: target || null
+                }).catch(e => console.warn('Activity log failed:', e));
+                loadUsers();
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user: ' + error.message);
+            }
+        }
+
+        // --- BULK ACTIONS ---
+        function toggleSelectAll() {
+            const master = document.getElementById('selectAll');
+            document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = master.checked);
+            updateBulkUI();
+        }
+
+        function updateBulkUI() {
+            const selected = document.querySelectorAll('.user-checkbox:checked');
+            const bulkBar = document.getElementById('bulkActions');
+            const countLabel = document.getElementById('selectedCount');
+            
+            if (selected.length > 0) {
+                bulkBar.style.display = 'flex';
+                countLabel.textContent = `${selected.length} selected`;
+            } else {
+                bulkBar.style.display = 'none';
+            }
+        }
+
+        async function bulkStatusUpdate(newStatus) {
+            const selected = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+            if (!selected.length) return;
+            
+            if (!confirm(`Update status to ${newStatus} for ${selected.length} users?`)) return;
+
+            try {
+                // We'll update them sequentially or via batch if we had it. 
+                // For now, sequentially but logged as bulk activity.
+                await Promise.all(selected.map(id => api.updateUser(id, { status: newStatus })));
+                
+                api.logActivity({
+                    action: 'BULK_UPDATE_STATUS',
+                    entity_type: 'user',
+                    description: `Bulk updated ${selected.length} users to status: ${newStatus}`,
+                    new_data: { ids: selected, status: newStatus }
+                }).catch(() => {});
+
+                alert('Bulk update successful');
+                loadUsers();
+                document.getElementById('selectAll').checked = false;
+                updateBulkUI();
+            } catch (err) {
+                alert('Bulk update failed: ' + err.message);
+            }
+        }
+
+        // --- CSV EXPORT ---
+        function downloadCSV() {
+            if (!currentUsers.length) return;
+            
+            const headers = ['ID', 'Name', 'Email', 'Role', 'Status', 'Wallet', 'Created At'];
+            const rows = currentUsers.map(u => [
+                u.id, 
+                u.full_name, 
+                u.email, 
+                u.role, 
+                u.status, 
+                u.wallet_balance, 
+                u.created_at
+            ]);
+
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + headers.map(h => `"${h}"`).join(",") + "\n"
+                + rows.map(r => r.map(cell => `"${cell}"`).join(",")).join("\n");
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `edudoc_users_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+    <!-- User Modal -->
+    <div id="userModal" class="modal">
+    <div class="modal-content">
+        
+        <div class="modal-header">
+            <h2 id="modalTitle" class="modal-title">Add User</h2>
+            <span onclick="closeUserModal()" class="close-btn">&times;</span>
+        </div>
+
+        <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" id="userFullName" class="styled-input" placeholder="e.g. John Doe">
+        </div>
+
+        <div class="form-group">
+            <label>Email Address *</label>
+            <input type="email" id="userEmail" class="styled-input" placeholder="e.g. john@example.com">
+        </div>
+
+        <div class="form-group" id="userPasswordContainer">
+            <label>Password</label>
+            <input type="password" id="userPassword" class="styled-input" placeholder="Leave blank to keep unchanged">
+        </div>
+
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="userPhone" class="styled-input" placeholder="+1 234 567 890">
+        </div>
+
+        <div class="form-group">
+            <label>Role *</label>
+            <select id="userRole" class="styled-input">
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Status</label>
+            <select id="userStatus" class="styled-input">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Banned">Banned</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Wallet Balance</label>
+            <input type="number" id="userWallet" class="styled-input" value="0">
+        </div>
+
+        <div class="form-group">
+            <label>Profile Image URL</label>
+            <input type="text" id="userProfileImage" class="styled-input" placeholder="https://...">
+        </div>
+
+        <button onclick="saveUser()" class="save-btn">Save Changes</button>
+    </div>
+</div>
+</body>
+</html>
