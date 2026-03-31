@@ -1,18 +1,5 @@
 {
   "version": 2,
   "buildCommand": "sed -i \"s|PLACEHOLDER_BACKEND_URL|$BACKEND_URL|g\" frontend/config.js",
-  "outputDirectory": "frontend",
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "routes": [
-    { "src": "/", "dest": "/login.html" },
-    { "src": "/login", "dest": "/login.html" },
-    { "src": "/dashboard", "dest": "/dashboard.html" },
-    { "src": "/products", "dest": "/products.html" },
-    { "src": "/users", "dest": "/users.html" },
-    { "src": "/offers", "dest": "/offers.html" },
-    { "src": "/activity", "dest": "/activity.html" },
-    { "src": "/transactions", "dest": "/transactions.html" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ]
+  "outputDirectory": "frontend"
 }
