@@ -200,6 +200,42 @@ body {
 }
 
 /* ---------------------------------------------------
+   SIDEBAR LOGOUT BUTTON
+--------------------------------------------------- */
+.sidebar-footer {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  width: 100%;
+  padding: 0 20px;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(254, 89, 89, 0.1);
+  border: 1px solid rgba(254, 89, 89, 0.25);
+  border-radius: 8px;
+  color: #fca5a5;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  font-family: "Poppins", sans-serif;
+}
+
+.logout-btn:hover {
+  background: rgba(254, 89, 89, 0.22);
+  border-color: rgba(254, 89, 89, 0.5);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+/* ---------------------------------------------------
    TOP HEADER — HIDDEN ON DESKTOP
 --------------------------------------------------- */
 .top-header {

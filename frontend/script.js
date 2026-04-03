@@ -4,6 +4,16 @@ function toggleSidebar() {
   if (sidebar) sidebar.classList.toggle('open');
 }
 
+// LOGOUT
+function logout() {
+  if (typeof api !== 'undefined' && api.removeToken) {
+    api.removeToken();
+  } else {
+    localStorage.removeItem('token');
+  }
+  window.location.href = 'login.html';
+}
+
 // Charts are initialized in dashboard.html with live data from the API.
 // This file intentionally does not create Chart instances.
 
